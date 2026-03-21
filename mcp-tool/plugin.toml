@@ -1,0 +1,12 @@
+[plugin]
+name        = "mcp-tool"
+version     = "1.0.0"
+api_version = 1
+description = "MCP client proxy — connects to MCP servers and exposes their tools to ayder"
+author      = "ayder"
+
+[dependencies]
+mcp = ">=1.0"
+
+[tools]
+definitions = "mcp_definitions.py"

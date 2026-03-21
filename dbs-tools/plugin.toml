@@ -1,0 +1,9 @@
+[plugin]
+name = "dbs-tools"
+version = "1.0.0"
+api_version = 1
+description = "Database inspection and query tools"
+author = "ayder"
+
+[tools]
+definitions = "dbs_tool_definitions.py"

@@ -1,0 +1,13 @@
+[plugin]
+name = "temporal-tools"
+version = "1.0.0"
+api_version = 1
+description = "Temporal workflow orchestration tools"
+author = "ayder"
+
+[dependencies]
+temporalio = ">=1.22.0,<1.23.0"
+pydantic = ">=2.0"
+
+[tools]
+definitions = "temporal_definitions.py"

@@ -1,0 +1,12 @@
+[plugin]
+name = "python-tools"
+version = "1.0.0"
+api_version = 1
+description = "Python code editing tools using CST"
+author = "ayder"
+
+[dependencies]
+libcst = ">=1.0"
+
+[tools]
+definitions = "python_editor_definitions.py"

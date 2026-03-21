@@ -1,0 +1,9 @@
+[plugin]
+name = "venv-tools"
+version = "1.0.0"
+api_version = 1
+description = "Python virtual environment management tools"
+author = "ayder"
+
+[tools]
+definitions = "venv_definitions.py"

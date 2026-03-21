@@ -1,13 +1,9 @@
-import pytest
-import asyncio
-import threading
-import concurrent.futures
-from unittest.mock import MagicMock, patch, AsyncMock
+from unittest.mock import MagicMock, AsyncMock
 
 
 def _reset_state():
     """Reset MCPState between tests."""
-    import importlib, sys
+    import sys
     for mod in ["mcp_state", "mcp_client"]:
         sys.modules.pop(mod, None)
 

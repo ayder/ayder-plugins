@@ -1,15 +1,29 @@
 # ayder-plugins
 
-Official plugin collection for [ayder-cli](https://github.com/your-org/ayder-cli). Each plugin directory is a self-contained, installable unit that extends ayder with additional tools.
+Official plugin collection for [ayder-cli](https://github.com/ayder/ayder-cli). Each plugin directory is a self-contained, installable unit that extends ayder with additional tools.
 
-## Plugins
+## Built-in Plugins
+
+Plugins maintained in this repository:
 
 | Plugin | Description | Dependencies |
 |---|---|---|
 | [`dbs-tools`](#dbs-tools) | DBS RAG API — semantic search over issues, tasks, and SQL | none |
+| [`mcp-tool`](#mcp-tool) | MCP client proxy — connects to MCP servers and exposes their tools | `mcp>=1.0` |
 | [`python-tools`](#python-tools) | CST-based Python code editor | `libcst>=1.0` |
 | [`temporal-tools`](#temporal-tools) | Temporal workflow orchestration | `temporalio>=1.22,<1.23`, `pydantic>=2.0` |
 | [`venv-tools`](#venv-tools) | Python virtual environment management | none |
+
+## External Plugins
+
+ayder plugins can be hosted anywhere — any public GitHub repository that contains a valid `plugin.toml` is installable directly:
+
+```bash
+ayder install-plugin https://github.com/some-user/my-ayder-plugin
+ayder install-plugin https://github.com/some-org/ayder-tools/tree/main/my-plugin
+```
+
+Community-contributed plugins are not listed here. If you're building one, see [README_AYDER_PLUGIN.md](README_AYDER_PLUGIN.md) for the plugin development guide and contract.
 
 ---
 
@@ -21,13 +35,13 @@ Install a plugin directly from a subdirectory of this repository:
 
 ```bash
 # Install globally (available in every project)
-ayder install-plugin https://github.com/your-org/ayder-plugins/tree/main/dbs-tools
+ayder install-plugin https://github.com/ayder/ayder-plugins/tree/main/dbs-tools
 
 # Install project-locally (only for the current project)
-ayder install-plugin https://github.com/your-org/ayder-plugins/tree/main/venv-tools --project-local
+ayder install-plugin https://github.com/ayder/ayder-plugins/tree/main/venv-tools --project-local
 
 # Install a plugin with pip dependencies
-ayder install-plugin https://github.com/your-org/ayder-plugins/tree/main/python-tools
+ayder install-plugin https://github.com/ayder/ayder-plugins/tree/main/python-tools
 # → prompts to install libcst if not present; pass --yes to skip the prompt
 ```
 
@@ -42,7 +56,7 @@ ayder install-plugin ./dbs-tools --project-local
 ### Force-overwrite an existing install
 
 ```bash
-ayder install-plugin https://github.com/your-org/ayder-plugins/tree/main/venv-tools --force
+ayder install-plugin https://github.com/ayder/ayder-plugins/tree/main/venv-tools --force
 ```
 
 ---
@@ -154,6 +168,28 @@ temporal_workflow(action, workflow_id?, queue_name?, signal_name?, payload?)
 Permission: `w`. Blocked in safe mode.
 
 The temporal worker is launched separately via `ayder --temporal-task-queue <queue>` (only available when this plugin is installed).
+
+---
+
+### mcp-tool
+
+MCP client proxy that connects ayder to any running [Model Context Protocol](https://modelcontextprotocol.io) server and exposes its tools as first-class ayder tools.
+
+**Tool:** `mcp_tool`
+
+```
+mcp_tool(server_name, tool_name, arguments?)
+```
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `server_name` | string | yes | Name of the configured MCP server |
+| `tool_name` | string | yes | Tool to invoke on the server |
+| `arguments` | object | no | Tool-specific arguments |
+
+MCP servers are configured in your ayder config. Once connected, their tools are available via `mcp_tool` or discovered automatically depending on your setup.
+
+Permission: `r` by default; individual tool calls inherit the permission level of the MCP server's declared capabilities.
 
 ---
 

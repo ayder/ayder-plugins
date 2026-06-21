@@ -50,7 +50,12 @@ def _build_definitions(servers: dict) -> Tuple[ToolDefinition, ...]:
     """Connect to all servers and build TOOL_DEFINITIONS."""
     mcp_client.ensure_loop()
 
-    taken: set[str] = {td.name for td in _ayder_defs_mod.TOOL_DEFINITIONS}
+    # Existing tool names, to avoid collisions. Use getattr with an empty
+    # fallback: discovery runs inside ayder's definition module body, and older
+    # ayder cores hadn't bound TOOL_DEFINITIONS yet at this point (a circular
+    # import). Falling back to () degrades gracefully (no collision detection)
+    # instead of crashing the whole plugin.
+    taken: set[str] = {td.name for td in getattr(_ayder_defs_mod, "TOOL_DEFINITIONS", ())}
     defs: list[ToolDefinition] = []
 
     for server_name, server_config in servers.items():

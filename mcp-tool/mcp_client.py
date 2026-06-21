@@ -114,7 +114,11 @@ def make_handler(server_name: str, mcp_tool_name: str):
 
 
 def set_green() -> None:
-    _set_status("mcp", "MCP", "green")
+    # Name the connected server(s) in the badge so ayder's status bar shows the
+    # active MCP, e.g. "MCP: news-digest".
+    servers = sorted(state.sessions.keys())
+    label = "MCP: " + ", ".join(servers) if servers else "MCP"
+    _set_status("mcp", label, "green")
 
 
 def set_red() -> None:

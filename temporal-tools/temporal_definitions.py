@@ -2,6 +2,7 @@
 
 from typing import Tuple
 
+import temporal_client
 from ayder_cli.tools.definition import ToolDefinition
 
 
@@ -50,3 +51,7 @@ TOOL_DEFINITIONS: Tuple[ToolDefinition, ...] = (
         safe_mode_blocked=True,
     ),
 )
+
+# Publish the Temporal status badge (green/red "TMP") to ayder's status bar at
+# load time. Never raises.
+temporal_client.publish_status()

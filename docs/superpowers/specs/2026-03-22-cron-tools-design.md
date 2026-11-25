@@ -26,7 +26,7 @@ No changes to `ayder-cli` core.
 
 ### ToolDefinition format
 
-`cron_definitions.py` follows the exact same `ToolDefinition` pattern used by existing plugins (`venv-tools`, `mcp-tool`). Refer to those as implementation reference. Key fields: `name`, `description`, `func_ref` (e.g. `"cron_scheduler:schedule_job"`), `parameters` (JSON Schema object), `permission`, `safe_mode_blocked`.
+`cron_definitions.py` follows the exact same `ToolDefinition` pattern used by existing plugins (`venv-tools`, `python-tools`). Refer to those as implementation reference. Key fields: `name`, `description`, `func_ref` (e.g. `"cron_scheduler:schedule_job"`), `parameters` (JSON Schema object), `permission`, `safe_mode_blocked`.
 
 The registry injects `project_ctx` transparently into any tool function whose signature includes that parameter (signature inspection, same as all other plugins). `project_ctx` is never included in the LLM-facing JSON Schema.
 

@@ -327,14 +327,14 @@ When ayder loads your plugin, it temporarily adds the plugin directory to `sys.p
 
 **Correct** (intra-plugin import):
 ```python
-# Inside temporal_client.py
-from temporal_contract import MyDataClass   # bare name — works
+# Inside my_client.py
+from my_contract import MyDataClass   # bare name — works
 ```
 
 **Wrong** (would fail outside the plugin install location):
 ```python
-from temporal_tools.temporal_contract import MyDataClass  # no package, never works
-from ayder_cli.services.temporal_contract import MyDataClass  # wrong namespace
+from my_tools.my_contract import MyDataClass  # no package, never works
+from ayder_cli.services.my_contract import MyDataClass  # wrong namespace
 ```
 
 Use bare module names for any cross-file imports *within* the same plugin. For imports from ayder itself (e.g., `ToolDefinition`, `ToolSuccess`), use the full `ayder_cli.*` path — these are always available since ayder is installed in the same environment.

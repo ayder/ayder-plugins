@@ -46,7 +46,15 @@ TOOL_DEFINITIONS: Tuple[ToolDefinition, ...] = (
             "Open a URL in a real Chrome browser and wait for the page to "
             "load. Starts the browser on first use (headless, throwaway "
             "profile by default). Returns the tab id, final URL, title and "
-            "profile. Call this before any other browser tool."
+            "profile. Call this before any other browser tool. "
+            "Console capture records the page's console messages and uncaught "
+            "exceptions. It is on automatically for local addresses (localhost "
+            "and loopback IPs such as 127.0.0.1) and off for remote addresses. "
+            "Keep local development and remote browsing in separate browsers: "
+            "call browser_close before switching between a local address and a "
+            "remote one, then browser_open the new address in a fresh browser. "
+            "Leave console unset for remote URLs unless you need to debug a "
+            "deployed site."
         ),
         parameters=_params(
             {
@@ -61,6 +69,13 @@ TOOL_DEFINITIONS: Tuple[ToolDefinition, ...] = (
                                             "(default true). Use false so the user "
                                             "can sign in by hand.",
                              "default": True},
+                "console": {"type": "boolean",
+                            "description": "Capture the page's console messages "
+                                           "and uncaught exceptions. Omit for auto: "
+                                           "on for local addresses (localhost and "
+                                           "loopback IPs), off for remote ones. An "
+                                           "explicit value holds for the browser "
+                                           "session until changed."},
                 "timeout_seconds": _TIMEOUT,
             },
             ["url"],
@@ -170,6 +185,12 @@ TOOL_DEFINITIONS: Tuple[ToolDefinition, ...] = (
                           "description": "Empty the buffer after reading "
                                          "(default true).",
                           "default": True},
+                "capture": {"type": "boolean",
+                            "description": "Turn console capture on or off without "
+                                           "navigating. Omit to leave capture "
+                                           "unchanged and only read. Turning it on "
+                                           "recovers what the current page has "
+                                           "logged; turning it off clears the buffer."},
             },
             [],
         ),

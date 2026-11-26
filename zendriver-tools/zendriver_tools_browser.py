@@ -12,6 +12,7 @@ import time
 from pathlib import Path
 
 import zendriver_tools_chrome as chrome
+import zendriver_tools_console as zconsole
 import zendriver_tools_profiles as profiles
 import zendriver_tools_state as state
 
@@ -45,14 +46,57 @@ async def _on_exception(event):
     state.console_buffer.append(("exception", text))
 
 
-async def setup_tab(tab):
-    """Capture and lifecycle events, enabled BEFORE the first navigation."""
+async def enable_capture(tab, *, discard):
+    """Arm console/exception capture. Handlers are attached BEFORE enable so
+    the replay is delivered deterministically (review Finding 1). discard=True
+    (the browser_open path, which navigates next) drops the page being left;
+    discard=False (the browser_console path) keeps the current page's stored
+    entries so they are recovered."""
     from zendriver import cdp
-    await tab.send(cdp.runtime.enable())
-    await tab.send(cdp.page.enable())
-    await tab.send(cdp.page.set_lifecycle_events_enabled(True))
+    if discard:
+        await tab.send(cdp.runtime.discard_console_entries())
     tab.add_handler(cdp.runtime.ConsoleAPICalled, _on_console)
     tab.add_handler(cdp.runtime.ExceptionThrown, _on_exception)
+    await tab.send(cdp.runtime.enable())
+
+
+async def disable_capture(tab):
+    """Stop capture and clear the buffer (explicit or automatic off, D-3)."""
+    from zendriver import cdp
+    tab.remove_handlers(cdp.runtime.ConsoleAPICalled, _on_console)
+    tab.remove_handlers(cdp.runtime.ExceptionThrown, _on_exception)
+    await tab.send(cdp.runtime.disable())
+    state.console_buffer.clear()
+
+
+async def settle_replay(deadline):
+    """Drain the capture handler tasks spawned by Runtime.enable's replay so a
+    browser_console(capture=true) call returns the recovered entries in that
+    same call. zendriver dispatches handlers as tasks (core/connection.py:1103,
+    asyncio.create_task); this drains them without running any page JavaScript.
+    Bounded by the call deadline."""
+    import asyncio
+    while True:
+        await asyncio.sleep(0)
+        pending = [t for t in asyncio.all_tasks()
+                   if not t.done()
+                   and getattr(t.get_coro(), "__name__", "")
+                   in ("_on_console", "_on_exception")]
+        if not pending:
+            return
+        await asyncio.gather(*pending, return_exceptions=True)
+        if time.monotonic() >= deadline:
+            return
+
+
+async def setup_tab(tab, capture):
+    """Lifecycle events always; capture only when requested. Both armed BEFORE
+    the first navigation. Page/lifecycle are independent of capture (D-5)."""
+    from zendriver import cdp
+    await tab.send(cdp.page.enable())
+    await tab.send(cdp.page.set_lifecycle_events_enabled(True))
+    if capture:
+        await enable_capture(tab, discard=True)
 
 
 async def navigate_and_wait(tab, url, deadline):
@@ -129,9 +173,11 @@ def close_worker(b, handle, directory, throwaway, end):
         state.headless_setting = None
         state.tab = None
         state.console_buffer.clear()
+        state.console_auto = True
+        state.console_capture = False
 
 
-async def open_work(ctx, url, profile, headless):
+async def open_work(ctx, url, profile, headless, console=None):
     if state.browser is not None:
         kind = state.profile_kind
         if profile is not None and kind != f"persistent:{profile}":
@@ -140,6 +186,22 @@ async def open_work(ctx, url, profile, headless):
         if headless is not None and headless != state.headless_setting:
             raise ConfigMismatch(
                 "a different headless setting is in use; call browser_close first")
+        # Capture is runtime-mutable, never a ConfigMismatch (D25/D26). An
+        # explicit value sticks; auto reclassifies the requested URL; an
+        # omitted value in explicit mode keeps the current setting.
+        if console is not None:
+            new_capture = console
+            state.console_auto = False
+        elif state.console_auto:
+            new_capture = zconsole.default_capture_for(url)
+        else:
+            new_capture = state.console_capture
+        if new_capture != state.console_capture:
+            if new_capture:
+                await enable_capture(state.tab, discard=True)
+            else:
+                await disable_capture(state.tab)
+        state.console_capture = new_capture
     else:
         if state.cleanup_pending or state.pending_reap:
             raise StillShuttingDown(
@@ -174,6 +236,12 @@ async def open_work(ctx, url, profile, headless):
         state.profile_dir = directory
         state.profile_kind = kind
         state.headless_setting = h
+        if console is not None:
+            state.console_capture = console
+            state.console_auto = False
+        else:
+            state.console_capture = zconsole.default_capture_for(url)
+            state.console_auto = True
         state.console_buffer.clear()
         tab = None
         while tab is None:
@@ -183,7 +251,7 @@ async def open_work(ctx, url, profile, headless):
                     raise state.DeadlineExpired("no tab appeared")
                 await asyncio.sleep(0.05)
         state.tab = tab
-        await setup_tab(tab)
+        await setup_tab(tab, state.console_capture)
     await navigate_and_wait(state.tab, url, ctx.deadline)
     final_url = await state.tab.evaluate("location.href")
     title = await state.tab.evaluate("document.title")

@@ -156,35 +156,81 @@ def browser_type(selector=None, value=None, timeout_seconds=30):
     import json
     from zendriver import cdp
 
+    sel = json.dumps(selector)
+    val = json.dumps(value)
+    # Readiness (spec rev5): the first match must be a text field with a
+    # positive rendered box, editable, and able to take focus. Returns the
+    # blocking reason, or null once ready — focus taken and the existing value
+    # selected so Backspace replaces it. A zero-sized control can still take
+    # focus, so the box check comes before the focus attempt.
+    ready = (
+        "(() => { const el = document.querySelector(" + sel + ");"
+        " if (!el) return 'not found';"
+        " const tag = el.tagName;"
+        " const types = ['text','search','tel','url','password','email','number'];"
+        " const isText = tag === 'TEXTAREA' || (tag === 'INPUT' &&"
+        "   types.indexOf((el.type || '').toLowerCase()) !== -1);"
+        " if (!isText) return 'not a text field';"
+        " const r = el.getBoundingClientRect();"
+        " if (!(r.width > 0 && r.height > 0)) return 'hidden';"
+        " if (el.disabled || el.readOnly) return 'not editable';"
+        " el.focus();"
+        " if (document.activeElement !== el) return 'not focused';"
+        " try { el.setSelectionRange(0, (el.value || '').length); } catch (e) {}"
+        " return null; })()")
+    focused = ("(() => { const el = document.querySelector(" + sel + ");"
+               " return !!el && document.activeElement === el; })()")
+    # Post-check: compare the field's value in-page and return only whether it
+    # matches and the length present — never either value.
+    post = ("(() => { const el = document.querySelector(" + sel + ");"
+            " if (!el || typeof el.value !== 'string')"
+            "   return {match: false, len: -1};"
+            " return {match: el.value === " + val + ", len: el.value.length}; })()")
+
+    last_reason = ["not found"]
+
     async def work(ctx):
         import asyncio
-        sel = json.dumps(selector)
-        focus = ("(() => { const el = document.querySelector(" + sel + ");"
-                 " if (!el) return false; el.focus();"
-                 " try { el.setSelectionRange(0, (el.value || '').length); }"
-                 " catch (e) {} return true; })()")
         while True:
             if ctx.deadline - time.monotonic() <= 0:
-                raise state.DeadlineExpired(
-                    f"selector {selector!r} not found before the deadline")
-            if await state.tab.evaluate(focus):
+                raise state.DeadlineExpired("not ready before the deadline")
+            reason = await state.tab.evaluate(ready)
+            if reason is None:
                 break
-            await asyncio.sleep(0.1)
+            last_reason[0] = reason
+            await asyncio.sleep(
+                min(0.1, max(0.0, ctx.deadline - time.monotonic())))
         for kind in ("keyDown", "keyUp"):
             await state.tab.send(cdp.input_.dispatch_key_event(
                 type_=kind, key="Backspace", code="Backspace",
                 windows_virtual_key_code=8, native_virtual_key_code=8))
+        # A Backspace/keydown handler may have moved focus; stop without
+        # replaying the edit so the element that took focus is not typed into.
+        if not await state.tab.evaluate(focused):
+            return "focus_lost", 0
         if value:
             await state.tab.send(cdp.input_.insert_text(value))
-        length = await state.tab.evaluate(
-            "(() => { const el = document.querySelector(" + sel + ");"
-            " return el && typeof el.value === 'string' ? el.value.length : -1; })()")
-        return length
+        result = await state.tab.evaluate(post)
+        if result.get("match"):
+            return "ok", result.get("len", 0)
+        return "mismatch", result.get("len", 0)
 
     try:
-        length = state.run_call(work, timeout_s=timeout_seconds)
+        outcome, length = state.run_call(work, timeout_s=timeout_seconds)
+    except state.DeadlineExpired:
+        return ToolError(
+            f"browser call exceeded its deadline: selector {selector!r} "
+            f"not ready before the deadline: {last_reason[0]}", "execution")
     except Exception as e:
         return _map_error(e)
+    if outcome == "focus_lost":
+        return ToolError(
+            "Focus left the field during the edit; input was not sent.",
+            "execution")
+    if outcome == "mismatch":
+        return ToolError(
+            f"The field did not retain the requested text "
+            f"({length} characters present).", "execution")
     return ToolSuccess(f"{selector} | {length} characters typed")
 
 

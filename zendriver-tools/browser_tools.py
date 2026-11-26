@@ -131,7 +131,39 @@ def browser_type(selector=None, value=None, timeout_seconds=30):
         v.require_browser(state.browser is not None)
     except v.ValidationError as e:
         return _err(e)
-    return ToolError("not implemented")
+    import json
+    from zendriver import cdp
+
+    async def work(ctx):
+        import asyncio
+        sel = json.dumps(selector)
+        focus = ("(() => { const el = document.querySelector(" + sel + ");"
+                 " if (!el) return false; el.focus();"
+                 " try { el.setSelectionRange(0, (el.value || '').length); }"
+                 " catch (e) {} return true; })()")
+        while True:
+            if ctx.deadline - time.monotonic() <= 0:
+                raise state.DeadlineExpired(
+                    f"selector {selector!r} not found before the deadline")
+            if await state.tab.evaluate(focus):
+                break
+            await asyncio.sleep(0.1)
+        for kind in ("keyDown", "keyUp"):
+            await state.tab.send(cdp.input_.dispatch_key_event(
+                type_=kind, key="Backspace", code="Backspace",
+                windows_virtual_key_code=8, native_virtual_key_code=8))
+        if value:
+            await state.tab.send(cdp.input_.insert_text(value))
+        length = await state.tab.evaluate(
+            "(() => { const el = document.querySelector(" + sel + ");"
+            " return el && typeof el.value === 'string' ? el.value.length : -1; })()")
+        return length
+
+    try:
+        length = state.run_call(work, timeout_s=timeout_seconds)
+    except Exception as e:
+        return _map_error(e)
+    return ToolSuccess(f"{selector} | {length} characters typed")
 
 
 def browser_eval(script=None, max_chars=20000, timeout_seconds=30):

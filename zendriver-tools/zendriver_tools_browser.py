@@ -166,6 +166,22 @@ async def open_work(ctx, url, profile, headless, console=None):
         if headless is not None and headless != state.headless_setting:
             raise ConfigMismatch(
                 "a different headless setting is in use; call browser_close first")
+        # Capture is runtime-mutable, never a ConfigMismatch (D25/D26). An
+        # explicit value sticks; auto reclassifies the requested URL; an
+        # omitted value in explicit mode keeps the current setting.
+        if console is not None:
+            new_capture = console
+            state.console_auto = False
+        elif state.console_auto:
+            new_capture = zconsole.default_capture_for(url)
+        else:
+            new_capture = state.console_capture
+        if new_capture != state.console_capture:
+            if new_capture:
+                await enable_capture(state.tab, discard=True)
+            else:
+                await disable_capture(state.tab)
+        state.console_capture = new_capture
     else:
         if state.cleanup_pending or state.pending_reap:
             raise StillShuttingDown(

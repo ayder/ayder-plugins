@@ -1,0 +1,17 @@
+<!doctype html>
+<html>
+<head>
+<title>Console Marker</title>
+<script>
+var params = new URLSearchParams(location.search);
+var m = params.get("m") || "none";
+console.log("marker-" + m);
+if (params.get("boom")) {
+  setTimeout(function () { throw new Error("early-error-" + m); }, 0);
+}
+</script>
+</head>
+<body>
+<div id="out">marker-page</div>
+</body>
+</html>

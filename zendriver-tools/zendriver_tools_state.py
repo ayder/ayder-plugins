@@ -11,6 +11,7 @@ holder. Cleanup ownership survives a timed-out caller: the lock is
 released by the cleanup worker's outcome, never by the unwinding call.
 """
 import asyncio
+import atexit
 import concurrent.futures
 import threading
 import time
@@ -144,6 +145,49 @@ def _finish_cleanup(exec_fut):
     global cleanup_pending
     cleanup_pending = False
     _lock.release()
+
+
+def _exit_handler():
+    """Normal interpreter exit: end the recorded Chrome child and delete an
+    owned throwaway dir. Uses neither stop() nor the event loop (D12).
+    Single cleanup owner: if another owner holds cleanup_mutex, take no
+    action (executor workers are joined before ordinary atexit handlers,
+    so this is unreachable in practice)."""
+    import shutil
+    import subprocess
+
+    h = handle
+    if h is None and browser is not None:
+        h = getattr(browser, "_process", None)
+    if h is None:
+        return
+    if not cleanup_mutex.acquire(timeout=2):
+        return
+    try:
+        try:
+            if h.poll() is None:
+                h.terminate()
+                try:
+                    h.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    h.kill()
+                    try:
+                        h.wait(timeout=2)
+                    except subprocess.TimeoutExpired:
+                        pass
+        except Exception:
+            pass
+        try:
+            if h.poll() is not None and profile_kind == "throwaway" \
+                    and profile_dir is not None:
+                shutil.rmtree(profile_dir, ignore_errors=True)
+        except Exception:
+            pass
+    finally:
+        cleanup_mutex.release()
+
+
+atexit.register(_exit_handler)
 
 
 def reset_for_test():

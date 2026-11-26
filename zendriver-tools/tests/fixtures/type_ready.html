@@ -1,0 +1,32 @@
+<!doctype html>
+<html>
+<head>
+<title>Type Ready Fixture</title>
+</head>
+<body>
+<input id="decoy" value="keep">
+<input id="hidden" value="secret" style="width:0;height:0;padding:0;border:0;margin:0;">
+<input id="readonly" value="ro" readonly>
+<input id="late-editable" value="" readonly>
+<input id="late-visible" value="" style="display:none">
+<input id="email" type="email" value="old@example.com">
+<input id="num" type="number" value="42">
+<button id="btn">Go</button>
+<input id="chk" type="checkbox">
+<input id="trap" value="ab">
+<input id="other" value="untouched">
+<input id="maxlen" maxlength="3" value="">
+<script>
+document.getElementById("decoy").focus();
+document.getElementById("trap").addEventListener("keydown", function (e) {
+  if (e.key === "Backspace") { document.getElementById("other").focus(); }
+});
+window.addEventListener("load", function () {
+  setTimeout(function () {
+    document.getElementById("late-editable").readOnly = false;
+    document.getElementById("late-visible").style.display = "block";
+  }, 400);
+});
+</script>
+</body>
+</html>

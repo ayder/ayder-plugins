@@ -1,4 +1,4 @@
-"""S1: the MVP tool contract — seven definitions, exact flags and schemas."""
+"""S1: the tool contract — nine definitions, exact flags and schemas."""
 import browser_definitions as bd
 
 EXPECTED = {
@@ -10,6 +10,8 @@ EXPECTED = {
     "browser_eval": ("x", True),
     "browser_console": ("r", False),
     "browser_close": ("w", True),
+    "browser_webmcp_list": ("r", False),
+    "browser_webmcp_call": ("x", True),
 }
 
 SUPPORTED_PARAMS = {
@@ -21,6 +23,9 @@ SUPPORTED_PARAMS = {
     "browser_eval": {"script", "max_chars", "timeout_seconds"},
     "browser_console": {"clear", "capture"},
     "browser_close": set(),
+    "browser_webmcp_list": {"max_chars", "timeout_seconds"},
+    "browser_webmcp_call": {"name", "arguments", "frame_id", "max_chars",
+                            "timeout_seconds"},
 }
 
 REQUIRED = {
@@ -31,6 +36,8 @@ REQUIRED = {
     "browser_eval": ["script"],
     "browser_console": [],
     "browser_close": [],
+    "browser_webmcp_list": [],
+    "browser_webmcp_call": ["name"],
 }
 
 

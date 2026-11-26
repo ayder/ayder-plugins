@@ -32,7 +32,7 @@ async def _on_console(event):
     for arg in event.args or []:
         val = getattr(arg, "value", None)
         parts.append(str(val if val is not None else getattr(arg, "description", "")))
-    state.console_buffer.append((str(event.type), " ".join(parts)))
+    state.console_buffer.append((str(event.type_), " ".join(parts)))
 
 
 async def _on_exception(event):

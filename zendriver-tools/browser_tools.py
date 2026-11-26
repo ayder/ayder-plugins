@@ -99,7 +99,21 @@ def browser_console(clear=True):
         v.require_browser(state.browser is not None)
     except v.ValidationError as e:
         return _err(e)
-    return ToolError("not implemented")
+
+    async def work(ctx):
+        entries = list(state.console_buffer)
+        if clear:
+            state.console_buffer.clear()
+        url = await state.tab.evaluate("location.href")
+        return entries, url
+
+    try:
+        entries, url = state.run_call(work, timeout_s=30)
+    except Exception as e:
+        return _map_error(e)
+    lines = [f"[{level}] {text}" for level, text in entries]
+    body = ("\n" + "\n".join(lines)) if lines else ""
+    return ToolSuccess(untrusted_line(url) + body)
 
 
 def browser_close():

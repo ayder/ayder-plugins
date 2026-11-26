@@ -95,7 +95,31 @@ def browser_click(selector=None, timeout_seconds=30):
         v.require_browser(state.browser is not None)
     except v.ValidationError as e:
         return _err(e)
-    return ToolError("not implemented")
+    import json
+
+    async def work(ctx):
+        import asyncio
+        expr = ("(() => { for (const el of document.querySelectorAll("
+                + json.dumps(selector) + ")) {"
+                " if (el.getClientRects().length > 0) {"
+                " el.scrollIntoView({block: 'center'}); el.click(); return true; } }"
+                " return false; })()")
+        while True:
+            if ctx.deadline - time.monotonic() <= 0:
+                raise state.DeadlineExpired(
+                    f"selector {selector!r} not clickable before the deadline")
+            if await state.tab.evaluate(expr):
+                break
+            await asyncio.sleep(0.1)
+        url = await state.tab.evaluate("location.href")
+        title = await state.tab.evaluate("document.title")
+        return url, title
+
+    try:
+        url, title = state.run_call(work, timeout_s=timeout_seconds)
+    except Exception as e:
+        return _map_error(e)
+    return ToolSuccess(f"{untrusted_line(url)}\n{url} | {title}")
 
 
 def browser_type(selector=None, value=None, timeout_seconds=30):

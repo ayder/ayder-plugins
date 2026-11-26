@@ -148,3 +148,59 @@ def test_navigation_independent_of_capture(fixture_server):
     assert "rendered-text" in str(bt.browser_read())
     assert isinstance(bt.browser_click(selector="#btn"), ToolSuccess)
     assert "changed-text" in str(bt.browser_read())
+
+
+# --- Step 4: browser_console(capture) no-navigation switch + recovery ------
+
+def test_console_capture_recovers_current_page(fixture_server):
+    base = fixture_server + "/console_marker.html"
+    assert isinstance(bt.browser_open(url=base + "?m=A&boom=1", console=False),
+                      ToolSuccess)
+    r = bt.browser_console(capture=True, clear=False)
+    assert isinstance(r, ToolSuccess)
+    text = str(r)
+    assert "marker-A" in text and "early-error-A" in text   # recovered, same call
+    # navigate to B off; recovering B must not bring back the page already left
+    assert isinstance(bt.browser_open(url=base + "?m=B&boom=1", console=False),
+                      ToolSuccess)
+    t2 = str(bt.browser_console(capture=True, clear=False))
+    assert "marker-B" in t2 and "early-error-B" in t2
+    assert "marker-A" not in t2 and "early-error-A" not in t2
+
+
+def test_console_capture_same_call_no_sleep(fixture_server):
+    base = fixture_server + "/console_marker.html"
+    assert isinstance(bt.browser_open(url=base + "?m=S&boom=1", console=False),
+                      ToolSuccess)
+    # No sleep in the test: the replay must be present in this same call.
+    r = bt.browser_console(capture=True, clear=False)
+    assert isinstance(r, ToolSuccess)
+    assert "marker-S" in str(r) and "early-error-S" in str(r)
+
+
+def test_console_capture_semantics_and_ordering(fixture_server):
+    url = fixture_server + "/page.html"
+    assert isinstance(bt.browser_open(url=url), ToolSuccess)   # auto on
+    assert "first-script-marker" in str(bt.browser_console(clear=False))
+    assert state.console_capture is True                       # omitted: no change
+    r = bt.browser_console(capture=False, clear=False)
+    assert "off" in str(r).lower() and "first-script-marker" not in str(r)
+    assert len(state.console_buffer) == 0 and state.console_capture is False
+    # capture=true + clear=true: recover the current page, return it, then empty
+    assert isinstance(bt.browser_open(
+        url=fixture_server + "/console_marker.html?m=O", console=False),
+        ToolSuccess)
+    r2 = bt.browser_console(capture=True, clear=True)
+    assert "marker-O" in str(r2)
+    assert len(state.console_buffer) == 0
+
+
+def test_capture_param_validation(fixture_server):
+    assert isinstance(bt.browser_open(url=fixture_server + "/page.html"),
+                      ToolSuccess)
+    assert isinstance(bt.browser_console(capture=1), ToolError)
+
+
+def test_capture_no_browser():
+    assert isinstance(bt.browser_console(capture=True), ToolError)
+    assert state.browser is None

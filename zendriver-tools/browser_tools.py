@@ -275,14 +275,27 @@ async def _current_url(ctx):
     return await state.tab.evaluate("location.href")
 
 
-def browser_console(clear=True):
+def browser_console(clear=True, capture=None):
     try:
         v.check_bool(clear, "clear")
+        if capture is not None:
+            v.check_bool(capture, "capture")
         v.require_browser(state.browser is not None)
     except v.ValidationError as e:
         return _err(e)
 
     async def work(ctx):
+        if capture is not None:
+            state.console_auto = False
+            if capture != state.console_capture:
+                if capture:
+                    # No navigation: keep the current page's stored entries and
+                    # recover them in this same call (review Finding 3).
+                    await zb.enable_capture(state.tab, discard=False)
+                    await zb.settle_replay(ctx.deadline)
+                else:
+                    await zb.disable_capture(state.tab)
+                state.console_capture = capture
         entries = list(state.console_buffer)
         if clear:
             state.console_buffer.clear()
@@ -290,12 +303,12 @@ def browser_console(clear=True):
         return entries, url, state.console_capture
 
     try:
-        entries, url, capture = state.run_call(work, timeout_s=30)
+        entries, url, capture_state = state.run_call(work, timeout_s=30)
     except Exception as e:
         return _map_error(e)
     lines = [f"[{level}] {text}" for level, text in entries]
     body = ("\n" + "\n".join(lines)) if lines else ""
-    if not capture:
+    if not capture_state:
         body = ("\nConsole capture is off; enable it with "
                 "browser_console(capture=true) or browser_open(console=true).")
     return ToolSuccess(untrusted_line(url) + body)

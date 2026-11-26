@@ -69,6 +69,26 @@ async def disable_capture(tab):
     state.console_buffer.clear()
 
 
+async def settle_replay(deadline):
+    """Drain the capture handler tasks spawned by Runtime.enable's replay so a
+    browser_console(capture=true) call returns the recovered entries in that
+    same call. zendriver dispatches handlers as tasks (core/connection.py:1103,
+    asyncio.create_task); this drains them without running any page JavaScript.
+    Bounded by the call deadline."""
+    import asyncio
+    while True:
+        await asyncio.sleep(0)
+        pending = [t for t in asyncio.all_tasks()
+                   if not t.done()
+                   and getattr(t.get_coro(), "__name__", "")
+                   in ("_on_console", "_on_exception")]
+        if not pending:
+            return
+        await asyncio.gather(*pending, return_exceptions=True)
+        if time.monotonic() >= deadline:
+            return
+
+
 async def setup_tab(tab, capture):
     """Lifecycle events always; capture only when requested. Both armed BEFORE
     the first navigation. Page/lifecycle are independent of capture (D-5)."""

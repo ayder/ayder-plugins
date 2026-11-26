@@ -177,6 +177,12 @@ TOOL_DEFINITIONS: Tuple[ToolDefinition, ...] = (
                           "description": "Empty the buffer after reading "
                                          "(default true).",
                           "default": True},
+                "capture": {"type": "boolean",
+                            "description": "Turn console capture on or off without "
+                                           "navigating. Omit to leave capture "
+                                           "unchanged and only read. Turning it on "
+                                           "recovers what the current page has "
+                                           "logged; turning it off clears the buffer."},
             },
             [],
         ),

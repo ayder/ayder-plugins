@@ -64,6 +64,23 @@ def register_parser():
     from zendriver import cdp
     cdp.util._event_parsers["WebMCP.toolResponded"] = ToolResponded
     cdp.util._event_parsers["WebMCP.toolsRemoved"] = ToolsRemoved
+    cdp.util._event_parsers["WebMCP.toolsAdded"] = ToolsAdded
+
+
+class ToolsAdded:
+    """WebMCP.toolsAdded keeping the raw tool dicts.
+
+    zendriver 0.18's Annotation parser keeps only readOnly/autosubmit and drops
+    untrustedContent/consequential/debugging, so the plugin preserves the raw
+    tool JSON for faithful annotation mapping (spec §5.1).
+    """
+
+    def __init__(self, tools):
+        self.tools = tools
+
+    @classmethod
+    def from_json(cls, json):
+        return cls(tools=list(json["tools"]))
 
 
 class RemovedTool:

@@ -7,6 +7,7 @@ inside a tool function cannot be found at call time. zendriver itself is an
 installed package and stays lazy (imported inside zendriver_tools_browser's
 functions), so loading the definitions does not import it."""
 import functools
+import json
 import time
 
 from ayder_cli.core.result import ToolError, ToolSuccess
@@ -337,3 +338,79 @@ def browser_close():
     except Exception as e:
         return _map_error(e)
     return ToolSuccess("browser closed")
+
+
+WEBMCP_OFF = ("WebMCP is off for this browser; call browser_close, then "
+              "browser_open(..., webmcp=true).")
+
+
+def _webmcp_tool_json(t, fid, frame, origin):
+    obj = {"name": t["name"], "description": t.get("description", ""),
+           "inputSchema": t.get("inputSchema") or {},
+           "declarative": t.get("backendNodeId") is not None,
+           "frameId": fid, "frame": frame, "origin": origin}
+    ann = t.get("annotations") or {}
+    mapped = {}
+    if ann.get("readOnly") is not None:
+        mapped["readOnlyHint"] = ann["readOnly"]
+    if ann.get("untrustedContent") is not None:
+        mapped["untrustedContentHint"] = ann["untrustedContent"]
+    if ann.get("consequential") is not None:
+        mapped["consequentialHint"] = ann["consequential"]
+    if ann.get("autosubmit") is not None:
+        mapped["autosubmit"] = ann["autosubmit"]
+    if mapped:
+        obj["annotations"] = mapped
+    return obj
+
+
+def browser_webmcp_list(max_chars=20000, timeout_seconds=30):
+    try:
+        v.check_max_chars(max_chars)
+        v.check_timeout(timeout_seconds)
+        v.require_browser(state.browser is not None)
+    except v.ValidationError as e:
+        return _err(e)
+    if state.webmcp_setting is False:
+        return ToolError(WEBMCP_OFF, "execution")
+
+    async def work(ctx):
+        from zendriver import cdp
+        if not await zb.webmcp_available(state.tab):
+            info = await state.tab.send(cdp.browser.get_version())
+            product = info[1]
+            ver = product.split("/", 1)[-1] if "/" in product else product
+            return ("unavailable", ver)
+        await zb.settle_webmcp(ctx.deadline)
+        tree = await state.tab.send(cdp.page.get_frame_tree())
+        frames = {}
+
+        def walk(node):
+            f = node.frame
+            frames[str(f.id_)] = (
+                "main" if f.parent_id is None else "child", f.security_origin)
+            for c in node.child_frames or []:
+                walk(c)
+        walk(tree)
+        tools = []
+        for (fid, name), t in state.webmcp_tools.items():
+            frame, origin = frames.get(fid, ("child", ""))
+            tools.append(_webmcp_tool_json(t, fid, frame, origin))
+        tools.sort(key=lambda x: (x["name"], x["frameId"]))
+        url = await state.tab.evaluate("location.href")
+        return ("ok", url, tools)
+
+    try:
+        res = state.run_call(work, timeout_s=timeout_seconds)
+    except Exception as e:
+        return _map_error(e)
+    if res[0] == "unavailable":
+        return ToolError(
+            f"WebMCP is not available on this page (Chrome {res[1]}).",
+            "execution")
+    _, url, tools = res
+    if not tools:
+        return ToolSuccess(untrusted_line(url)
+                           + "\nNo WebMCP tools are registered on this page.")
+    return ToolSuccess(format_eval(
+        url, json.dumps(tools, ensure_ascii=False), max_chars))

@@ -142,7 +142,7 @@ async def navigate_and_wait(tab, url, deadline):
 
 async def _on_tools_added(ev):
     for t in ev.tools:
-        state.webmcp_tools[(str(t.frame_id), t.name)] = t
+        state.webmcp_tools[(str(t["frameId"]), t["name"])] = t
 
 
 async def _on_tools_removed(ev):
@@ -181,7 +181,7 @@ async def setup_webmcp(tab):
     from zendriver import cdp
     zwebmcp.register_parser()
     state.webmcp_response_event = asyncio.Event()
-    tab.add_handler(cdp.web_mcp.ToolsAdded, _on_tools_added)
+    tab.add_handler(zwebmcp.ToolsAdded, _on_tools_added)
     tab.add_handler(zwebmcp.ToolsRemoved, _on_tools_removed)
     tab.add_handler(zwebmcp.ToolResponded, _on_tool_responded)
     tab.add_handler(cdp.page.FrameNavigated, _on_frame_navigated)

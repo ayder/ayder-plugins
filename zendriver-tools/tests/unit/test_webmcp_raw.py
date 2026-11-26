@@ -58,3 +58,18 @@ def test_tools_removed_slim_shape_parsed():
     assert isinstance(ev, wm.ToolsRemoved)
     assert ev.tools[0].name == "echo"
     assert str(ev.tools[0].frame_id) == "F1"
+
+
+def test_tools_added_preserves_raw_annotations():
+    # zendriver's Annotation parser drops untrustedContent/consequential; the
+    # plugin keeps the raw tool dict so they can be mapped.
+    wm.register_parser()
+    ev = cdp.util.parse_json_event({
+        "method": "WebMCP.toolsAdded",
+        "params": {"tools": [{"name": "echo", "description": "d", "frameId": "F1",
+                              "annotations": {"readOnly": True,
+                                              "untrustedContent": True,
+                                              "consequential": False}}]}})
+    assert isinstance(ev, wm.ToolsAdded)
+    ann = ev.tools[0]["annotations"]
+    assert ann["untrustedContent"] is True and ann["consequential"] is False

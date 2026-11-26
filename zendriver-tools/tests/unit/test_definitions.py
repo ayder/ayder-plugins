@@ -13,7 +13,7 @@ EXPECTED = {
 }
 
 SUPPORTED_PARAMS = {
-    "browser_open": {"url", "profile", "headless", "timeout_seconds"},
+    "browser_open": {"url", "profile", "headless", "console", "timeout_seconds"},
     "browser_read": {"selector", "max_chars", "timeout_seconds"},
     "browser_click": {"selector", "timeout_seconds"},
     "browser_type": {"selector", "value", "timeout_seconds"},

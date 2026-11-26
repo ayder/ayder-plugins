@@ -46,19 +46,22 @@ def _map_error(exc):
     return ToolError(f"browser error: {exc}", "execution")
 
 
-def browser_open(url, profile=None, headless=None, timeout_seconds=30):
+def browser_open(url, profile=None, headless=None, console=None,
+                 timeout_seconds=30):
     try:
         v.check_url(url)
         v.check_profile(profile)
         v.check_timeout(timeout_seconds)
         if headless is not None:
             v.check_bool(headless, "headless")
+        if console is not None:
+            v.check_bool(console, "console")
     except v.ValidationError as e:
         return _err(e)
     try:
         final_url, title, kind = state.run_call(
             functools.partial(zb.open_work, url=url, profile=profile,
-                              headless=headless),
+                              headless=headless, console=console),
             timeout_s=timeout_seconds, startup=True,
             cleanup=process.cleanup_launch)
     except Exception as e:
@@ -284,14 +287,17 @@ def browser_console(clear=True):
         if clear:
             state.console_buffer.clear()
         url = await state.tab.evaluate("location.href")
-        return entries, url
+        return entries, url, state.console_capture
 
     try:
-        entries, url = state.run_call(work, timeout_s=30)
+        entries, url, capture = state.run_call(work, timeout_s=30)
     except Exception as e:
         return _map_error(e)
     lines = [f"[{level}] {text}" for level, text in entries]
     body = ("\n" + "\n".join(lines)) if lines else ""
+    if not capture:
+        body = ("\nConsole capture is off; enable it with "
+                "browser_console(capture=true) or browser_open(console=true).")
     return ToolSuccess(untrusted_line(url) + body)
 
 

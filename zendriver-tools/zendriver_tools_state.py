@@ -24,6 +24,8 @@ profile_kind = None     # "throwaway" | "persistent:<name>"
 headless_setting = None
 tab = None              # the single current tab (MVP)
 console_buffer = deque(maxlen=500)
+console_auto = True     # capture follows the URL host until an explicit value
+console_capture = False  # effective capture setting for the current tab
 
 loop = None
 _loop_thread = None
@@ -193,7 +195,7 @@ def reset_for_test():
     """Teardown helper: drain/stop/join/close the loop, then clear state."""
     global loop, _loop_thread, _lock, browser, handle, profile_dir
     global profile_kind, headless_setting, tab, cleanup_pending, pending_reap
-    global cleanup_worker
+    global cleanup_worker, console_auto, console_capture
     if loop is not None and _loop_thread is not None:
         async def _drain():
             tasks = [t for t in asyncio.all_tasks()
@@ -218,6 +220,8 @@ def reset_for_test():
     headless_setting = None
     tab = None
     console_buffer.clear()
+    console_auto = True
+    console_capture = False
     cleanup_pending = False
     pending_reap = False
     cleanup_worker = None

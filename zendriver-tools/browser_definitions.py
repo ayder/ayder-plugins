@@ -61,6 +61,13 @@ TOOL_DEFINITIONS: Tuple[ToolDefinition, ...] = (
                                             "(default true). Use false so the user "
                                             "can sign in by hand.",
                              "default": True},
+                "console": {"type": "boolean",
+                            "description": "Capture the page's console messages "
+                                           "and uncaught exceptions. Omit for auto: "
+                                           "on for local addresses (localhost and "
+                                           "loopback IPs), off for remote ones. An "
+                                           "explicit value holds for the browser "
+                                           "session until changed."},
                 "timeout_seconds": _TIMEOUT,
             },
             ["url"],

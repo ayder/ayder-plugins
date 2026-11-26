@@ -1,6 +1,7 @@
 """Tool handlers — the only func_ref target. All mutable state lives in
 zendriver_tools_state (never re-imported by ayder). MVP: one tab."""
 import functools
+import time
 
 from ayder_cli.core.result import ToolError, ToolSuccess
 
@@ -57,7 +58,34 @@ def browser_read(selector=None, max_chars=20000, timeout_seconds=30):
         v.require_browser(state.browser is not None)
     except v.ValidationError as e:
         return _err(e)
-    return ToolError("not implemented")
+    import json
+    from zendriver_tools_format import format_read
+
+    async def work(ctx):
+        import asyncio
+        if selector is None:
+            expr = "document.body ? document.body.innerText : ''"
+        else:
+            expr = ("(() => { const el = document.querySelector("
+                    + json.dumps(selector) + "); return el ? el.innerText : null; })()")
+        while True:
+            text = await state.tab.evaluate(expr)
+            if text or selector is None:
+                break  # whole-page reads return immediately, even if empty
+            if ctx.deadline - time.monotonic() <= 0:
+                if text is None:
+                    raise state.DeadlineExpired(
+                        f"selector {selector!r} not found before the deadline")
+                break  # element exists but is still empty at the deadline
+            await asyncio.sleep(0.1)
+        url = await state.tab.evaluate("location.href")
+        return text, url
+
+    try:
+        text, url = state.run_call(work, timeout_s=timeout_seconds)
+    except Exception as e:
+        return _map_error(e)
+    return ToolSuccess(format_read(url, text, max_chars))
 
 
 def browser_click(selector=None, timeout_seconds=30):

@@ -1,13 +1,30 @@
 """Tool handlers — the only func_ref target. All mutable state lives in
 zendriver_tools_state (never re-imported by ayder). MVP: one tab."""
+import functools
+
 from ayder_cli.core.result import ToolError, ToolSuccess
 
 import zendriver_tools_state as state
 import zendriver_tools_validation as v
+from zendriver_tools_format import untrusted_line
 
 
 def _err(exc):
     return ToolError(str(exc), "validation")
+
+
+def _map_error(exc):
+    import zendriver_tools_browser as zb
+    import zendriver_tools_chrome as chrome
+    import zendriver_tools_profiles as profiles
+    if isinstance(exc, (v.ValidationError, profiles.ProfileError)):
+        return ToolError(str(exc), "validation")
+    if isinstance(exc, state.DeadlineExpired):
+        return ToolError(f"browser call exceeded its deadline: {exc}", "execution")
+    if isinstance(exc, (chrome.ChromeError, zb.NavigationError,
+                        zb.StillShuttingDown, zb.ConfigMismatch)):
+        return ToolError(str(exc), "execution")
+    return ToolError(f"browser error: {exc}", "execution")
 
 
 def browser_open(url, profile=None, headless=None, timeout_seconds=30):
@@ -19,7 +36,16 @@ def browser_open(url, profile=None, headless=None, timeout_seconds=30):
             v.check_bool(headless, "headless")
     except v.ValidationError as e:
         return _err(e)
-    return ToolError("not implemented")
+    import zendriver_tools_browser as zb
+    try:
+        final_url, title, kind = state.run_call(
+            functools.partial(zb.open_work, url=url, profile=profile,
+                              headless=headless),
+            timeout_s=timeout_seconds, startup=True)
+    except Exception as e:
+        return _map_error(e)
+    return ToolSuccess(
+        f"{untrusted_line(final_url)}\nt1 | {final_url} | {title} | {kind}")
 
 
 def browser_read(selector=None, max_chars=20000, timeout_seconds=30):

@@ -160,9 +160,10 @@ def browser_type(selector=None, value=None, timeout_seconds=30):
     val = json.dumps(value)
     # Readiness (spec rev5): the first match must be a text field with a
     # positive rendered box, editable, and able to take focus. Returns the
-    # blocking reason, or null once ready — focus taken and the existing value
-    # selected so Backspace replaces it. A zero-sized control can still take
-    # focus, so the box check comes before the focus attempt.
+    # blocking reason, or null once ready — focus taken and the old value
+    # selected via el.select() so Backspace replaces it (setSelectionRange
+    # throws on type=email/number, which would append instead of replace). A
+    # zero-sized control can still take focus, so the box check comes first.
     ready = (
         "(() => { const el = document.querySelector(" + sel + ");"
         " if (!el) return 'not found';"
@@ -176,7 +177,7 @@ def browser_type(selector=None, value=None, timeout_seconds=30):
         " if (el.disabled || el.readOnly) return 'not editable';"
         " el.focus();"
         " if (document.activeElement !== el) return 'not focused';"
-        " try { el.setSelectionRange(0, (el.value || '').length); } catch (e) {}"
+        " try { el.select(); } catch (e) {}"
         " return null; })()")
     focused = ("(() => { const el = document.querySelector(" + sel + ");"
                " return !!el && document.activeElement === el; })()")

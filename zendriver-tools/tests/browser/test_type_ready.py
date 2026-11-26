@@ -110,3 +110,20 @@ def test_maxlength_mismatch_no_echo(fixture_server):
     assert "abcdef" not in s
     assert "abc" not in s
     assert _val("maxlen") == "abc"
+
+
+def test_prefilled_email_replaced(fixture_server):
+    _open(fixture_server)
+    r = bt.browser_type(selector="#email", value="new@example.org",
+                        timeout_seconds=5)
+    assert isinstance(r, ToolSuccess), r
+    assert _val("email") == "new@example.org"
+    assert "new@example.org" not in str(r)
+
+
+def test_prefilled_number_replaced(fixture_server):
+    _open(fixture_server)
+    r = bt.browser_type(selector="#num", value="7", timeout_seconds=5)
+    assert isinstance(r, ToolSuccess), r
+    assert _val("num") == "7"
+    assert "7" not in str(r)

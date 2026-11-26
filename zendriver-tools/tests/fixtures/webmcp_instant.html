@@ -1,0 +1,10 @@
+<!doctype html>
+<title>WebMCP Instant</title>
+<script>
+document.modelContext.registerTool({
+  name: "instant", description: "Resolves immediately.",
+  inputSchema: {type: "object", properties: {}},
+  execute: () => ({content: [{type: "text", text: "instant-done"}]}),
+});
+</script>
+<p>instant</p>

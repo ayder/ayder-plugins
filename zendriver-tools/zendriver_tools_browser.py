@@ -212,6 +212,32 @@ async def webmcp_available(tab):
     return await tab.evaluate("typeof document.modelContext") == "object"
 
 
+async def wait_webmcp_response(invocation_id, deadline, name):
+    """Wait for the toolResponded with this invocationId. Checks the buffer
+    first so a fast tool's response is never lost to the race between the
+    invokeTool response and the event (P-4, AC-W7b). No fixed sleep."""
+    import asyncio
+    while True:
+        if invocation_id in state.webmcp_responses:
+            return state.webmcp_responses.pop(invocation_id)
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise state.DeadlineExpired(
+                f"WebMCP tool '{name}' did not respond before the deadline")
+        ev = state.webmcp_response_event
+        if ev is None:
+            raise state.DeadlineExpired(
+                f"WebMCP tool '{name}' did not respond before the deadline")
+        ev.clear()
+        if invocation_id in state.webmcp_responses:
+            continue
+        try:
+            await asyncio.wait_for(ev.wait(), remaining)
+        except asyncio.TimeoutError:
+            raise state.DeadlineExpired(
+                f"WebMCP tool '{name}' did not respond before the deadline")
+
+
 def close_worker(b, handle, directory, throwaway, end):
     """One executor worker owns the WHOLE normal shutdown: it takes
     cleanup_mutex BEFORE stop() (which itself signals the child), runs

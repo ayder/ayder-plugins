@@ -10,6 +10,7 @@ Plugins maintained in this repository:
 |---|---|---|
 | [`python-tools`](#python-tools) | CST-based Python code editor | `libcst>=1.0` |
 | [`venv-tools`](#venv-tools) | Python virtual environment management | none |
+| [`zendriver-tools`](#zendriver-tools) | Drive a real Chrome browser (open, read, click, type, eval, console, close) | `zendriver>=0.18,<0.19` |
 
 ## External Plugins
 
@@ -135,6 +136,41 @@ Create and manage Python virtual environments from within ayder.
 | `remove_virtualenv` | Remove a venv (supports `force=true`) |
 
 Permission: `x` for create/install/remove, `r` for list/activate.
+
+---
+
+### zendriver-tools
+
+Drive a real Chrome browser from ayder: read JavaScript-heavy pages, debug a localhost app, or work on a site you signed in to by hand. MVP: seven tools, one browser, one tab; macOS and Linux.
+
+**Tools:** `browser_open`, `browser_read`, `browser_click`, `browser_type`, `browser_eval`, `browser_console`, `browser_close`
+
+| Tool | Description |
+|---|---|
+| `browser_open` | Open an `http`/`https`/`about:blank` URL and wait for load; starts Chrome (headless, throwaway profile by default) |
+| `browser_read` | Read rendered page text, optionally by CSS selector |
+| `browser_click` | Click the first visible element matching a CSS selector |
+| `browser_type` | Replace an input field's value (never echoes the value) |
+| `browser_eval` | Evaluate a JSON-valued JavaScript expression once; promises awaited |
+| `browser_console` | Read captured console messages and uncaught exceptions |
+| `browser_close` | Stop the browser; deletes a throwaway profile, keeps a persistent one |
+
+Permissions: `http` for open, `r` for read/console, `x` for click/type/eval, `w` for close. Open, click, type, eval and close are blocked in safe mode.
+
+**Install (project-local):**
+
+```bash
+ayder install-plugin ./zendriver-tools --project
+```
+
+**Signing in by hand (persistent profile):**
+
+1. `browser_open(url="<login page>", profile="work", headless=false)` — a visible window opens.
+2. You sign in in that window yourself. Never ask the agent to type passwords or one-time codes.
+3. `browser_close()`.
+4. Later, reopen with `browser_open(url=..., profile="work")` to reuse the session. On a signed-in profile, the agent asks you before submitting forms, sending messages, buying, or deleting anything.
+
+**License:** this plugin is AGPL-3.0 (matching zendriver); it carries its own `LICENSE` and is not distributed with ayder-cli, which stays MIT.
 
 ---
 

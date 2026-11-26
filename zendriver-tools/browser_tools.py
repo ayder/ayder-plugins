@@ -1,23 +1,41 @@
 """Tool handlers — the only func_ref target. All mutable state lives in
-zendriver_tools_state (never re-imported by ayder). MVP: one tab."""
+zendriver_tools_state (never re-imported by ayder). MVP: one tab.
+
+Every plugin-local import is at module level: ayder's loader puts the plugin
+folder on sys.path only while the plugin loads, so a sibling imported first
+inside a tool function cannot be found at call time. zendriver itself is an
+installed package and stays lazy (imported inside zendriver_tools_browser's
+functions), so loading the definitions does not import it."""
 import functools
 import time
 
 from ayder_cli.core.result import ToolError, ToolSuccess
 
+import zendriver_tools_browser as zb
+import zendriver_tools_chrome as chrome
+import zendriver_tools_process as process
+import zendriver_tools_profiles as profiles
 import zendriver_tools_state as state
 import zendriver_tools_validation as v
-from zendriver_tools_format import untrusted_line
+from zendriver_tools_format import format_eval, format_read, untrusted_line
+
+MISSING_DRIVER = (
+    "zendriver is not installed in ayder's Python environment. Reinstall the "
+    "plugin with its dependencies: ayder install-plugin <source> --force --yes")
 
 
 def _err(exc):
     return ToolError(str(exc), "validation")
 
 
+def _missing_driver(exc):
+    return (isinstance(exc, ModuleNotFoundError)
+            and (exc.name or "").split(".")[0] == "zendriver")
+
+
 def _map_error(exc):
-    import zendriver_tools_browser as zb
-    import zendriver_tools_chrome as chrome
-    import zendriver_tools_profiles as profiles
+    if _missing_driver(exc):
+        return ToolError(MISSING_DRIVER, "execution")
     if isinstance(exc, (v.ValidationError, profiles.ProfileError)):
         return ToolError(str(exc), "validation")
     if isinstance(exc, state.DeadlineExpired):
@@ -37,12 +55,12 @@ def browser_open(url, profile=None, headless=None, timeout_seconds=30):
             v.check_bool(headless, "headless")
     except v.ValidationError as e:
         return _err(e)
-    import zendriver_tools_browser as zb
     try:
         final_url, title, kind = state.run_call(
             functools.partial(zb.open_work, url=url, profile=profile,
                               headless=headless),
-            timeout_s=timeout_seconds, startup=True)
+            timeout_s=timeout_seconds, startup=True,
+            cleanup=process.cleanup_launch)
     except Exception as e:
         return _map_error(e)
     return ToolSuccess(
@@ -59,7 +77,6 @@ def browser_read(selector=None, max_chars=20000, timeout_seconds=30):
     except v.ValidationError as e:
         return _err(e)
     import json
-    from zendriver_tools_format import format_read
 
     async def work(ctx):
         import asyncio
@@ -180,7 +197,6 @@ def browser_eval(script=None, max_chars=20000, timeout_seconds=30):
     except v.ValidationError as e:
         return _err(e)
     from zendriver.core.connection import ProtocolException
-    from zendriver_tools_format import format_eval
 
     wrapped = ("(async () => { const v = await (" + script + ");"
                " const s = JSON.stringify(v);"
@@ -238,7 +254,6 @@ def browser_close():
     except v.ValidationError as e:
         return _err(e)
     import asyncio
-    import zendriver_tools_browser as zb
 
     async def work(ctx):
         b = state.browser

@@ -9,6 +9,8 @@ class ChromeError(Exception):
 
 
 def _search():
+    # Outside the try: a missing zendriver must propagate as
+    # ModuleNotFoundError, not read as "no Chrome found".
     from zendriver.core.config import find_executable
     try:
         return find_executable(browser="chrome")

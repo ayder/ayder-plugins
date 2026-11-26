@@ -1,7 +1,6 @@
 """S22 / Evidence 1 (workflow): through the real registry's registered
 handlers, drive one localhost fixture end to end and check actual values."""
 import time
-from pathlib import Path
 
 import pytest
 
@@ -11,11 +10,9 @@ from zendriver_tools_format import untrusted_line
 
 pytestmark = pytest.mark.browser
 
-REPO = Path(__file__).resolve().parents[3]
 
-
-def test_registry_workflow(fixture_server):
-    reg = create_default_registry(ProjectContext(root_dir=str(REPO)))
+def test_registry_workflow(fixture_server, staged_project):
+    reg = create_default_registry(ProjectContext(root_dir=str(staged_project)))
     url = fixture_server + "/page.html"
 
     r = reg.execute("browser_open", {"url": url})

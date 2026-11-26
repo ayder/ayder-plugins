@@ -31,7 +31,7 @@ _lock = None            # asyncio.Lock, created on the private loop
 cleanup_mutex = threading.Lock()
 cleanup_pending = False  # a cleanup worker is submitted, outcome not recorded
 pending_reap = False     # a child may still be alive; blocks every new launch
-cleanup_worker = None    # injectable for tests; default: process.cleanup_launch
+cleanup_worker = None    # test override for the worker run_call is given
 
 
 class DeadlineExpired(Exception):
@@ -68,17 +68,21 @@ def ensure_loop():
     return loop
 
 
-def run_call(work, *, timeout_s, startup=False):
+def run_call(work, *, timeout_s, startup=False, cleanup=None):
     """Run one tool's driver work on the private loop under the lock.
     The deadline is absolute from tool entry; the extra 10 s grace applies
-    only to a call that actually began a launch."""
+    only to a call that actually began a launch. `cleanup(ctx, end)` reaps a
+    launch that began and then failed; the caller passes it in (browser_open
+    gives zendriver_tools_process.cleanup_launch) because that module imports
+    this one, and importing it here at call time fails once ayder's loader has
+    taken the plugin folder off sys.path."""
     deadline = time.monotonic() + timeout_s
     if time.monotonic() >= deadline:
         raise DeadlineExpired("deadline expired before dispatch")
     ctx = CallCtx(deadline)
     lp = ensure_loop()
     fut = asyncio.run_coroutine_threadsafe(
-        _guarded(work, ctx, deadline + 10.0, startup), lp)
+        _guarded(work, ctx, deadline + 10.0, startup, cleanup), lp)
     try:
         return fut.result(timeout=max(0.0, deadline - time.monotonic()))
     except (concurrent.futures.TimeoutError, concurrent.futures.CancelledError):
@@ -96,7 +100,7 @@ def run_call(work, *, timeout_s, startup=False):
         raise DeadlineExpired("call exceeded its deadline")
 
 
-async def _guarded(work, ctx, cleanup_end, startup):
+async def _guarded(work, ctx, cleanup_end, startup, cleanup):
     remaining = ctx.deadline - time.monotonic()
     if remaining <= 0:
         raise DeadlineExpired("expired before dispatch")
@@ -115,12 +119,7 @@ async def _guarded(work, ctx, cleanup_end, startup):
             if startup and ctx.launch_began:
                 global cleanup_pending
                 cleanup_pending = True
-                worker = cleanup_worker
-                if worker is None:
-                    try:
-                        from zendriver_tools_process import cleanup_launch as worker
-                    except ImportError:
-                        worker = None
+                worker = cleanup_worker or cleanup
                 if worker is None:
                     # No worker available: block replacement conservatively.
                     global pending_reap

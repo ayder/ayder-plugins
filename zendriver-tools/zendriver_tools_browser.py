@@ -1,14 +1,15 @@
 """Driver helpers: launch, tab setup, loader-correlated navigation, capture.
 
 Every coroutine here runs on the private loop via state.run_call.
+
+zendriver is imported inside the functions that use it, so ayder can load the
+plugin's definitions without it (and without paying its import time at every
+start); a missing zendriver surfaces from browser_open as ModuleNotFoundError.
 """
 import asyncio
 import tempfile
 import time
 from pathlib import Path
-
-import zendriver as zd
-from zendriver import cdp
 
 import zendriver_tools_chrome as chrome
 import zendriver_tools_profiles as profiles
@@ -46,6 +47,7 @@ async def _on_exception(event):
 
 async def setup_tab(tab):
     """Capture and lifecycle events, enabled BEFORE the first navigation."""
+    from zendriver import cdp
     await tab.send(cdp.runtime.enable())
     await tab.send(cdp.page.enable())
     await tab.send(cdp.page.set_lifecycle_events_enabled(True))
@@ -57,6 +59,7 @@ async def navigate_and_wait(tab, url, deadline):
     """Arm the lifecycle observer, navigate, and wait for the destination's
     main-frame load with its loader. Events arriving before the navigate
     response are buffered, then matched (review 3, finding 3)."""
+    from zendriver import cdp
     events = []
     signaled = asyncio.Event()
 
@@ -141,7 +144,8 @@ async def open_work(ctx, url, profile, headless):
         if state.cleanup_pending or state.pending_reap:
             raise StillShuttingDown(
                 "the previous browser is still shutting down; try again later")
-        exe = chrome.resolve_executable()
+        import zendriver as zd   # before the Chrome search: a missing driver
+        exe = chrome.resolve_executable()  # must not read as a missing Chrome
         if profile is not None:
             directory = profiles.prepare_profile(profile)
             profiles.check_profile_lock(directory)

@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+<head>
+<title>Fixture Page</title>
+<script>console.log("first-script-marker");</script>
+</head>
+<body>
+<div id="out">loading</div>
+<input id="field" value="abc">
+<button id="btn">Change</button>
+<div id="empty"></div>
+<script>
+document.getElementById("out").textContent = "rendered-text";
+document.getElementById("btn").addEventListener("click", function () {
+  document.getElementById("out").textContent = "changed-text";
+});
+window.addEventListener("load", function () {
+  setTimeout(function () {
+    var d = document.createElement("div");
+    d.id = "late";
+    d.textContent = "late-text";
+    document.body.appendChild(d);
+  }, 500);
+});
+</script>
+</body>
+</html>

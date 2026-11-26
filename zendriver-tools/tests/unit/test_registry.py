@@ -1,12 +1,9 @@
 """S22 / Evidence 1 (definitions part): a fresh isolated process builds the
-real registry from the project-installed copy."""
+real registry from a project-installed copy."""
 import json
 import os
 import subprocess
 import sys
-from pathlib import Path
-
-REPO = Path(__file__).resolve().parents[3]
 
 SCRIPT = r"""
 import json, os
@@ -28,11 +25,12 @@ print(json.dumps(out))
 """
 
 
-def test_registry_smoke(tmp_path):
+def test_registry_smoke(tmp_path, staged_project):
     env = os.environ.copy()
     env["HOME"] = str(tmp_path / "home")   # isolate global plugins
     (tmp_path / "home").mkdir()
-    r = subprocess.run([sys.executable, "-c", SCRIPT], cwd=REPO, env=env,
+    r = subprocess.run([sys.executable, "-I", "-c", SCRIPT],
+                       cwd=staged_project, env=env,
                        capture_output=True, text=True, timeout=120)
     assert r.returncode == 0, r.stderr
     out = json.loads(r.stdout.strip().splitlines()[-1])
@@ -51,6 +49,6 @@ def test_registry_smoke(tmp_path):
     assert out["budget"]["browser_read"] == 0
     assert out["budget"]["browser_eval"] == 0
     assert out["prompt"] is True
-    installed = str(REPO / ".ayder" / "plugins" / "zendriver-tools")
+    installed = str(staged_project / ".ayder" / "plugins" / "zendriver-tools")
     for f in out["handler_files"].values():
         assert f.startswith(installed), f

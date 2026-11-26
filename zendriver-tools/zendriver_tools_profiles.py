@@ -74,6 +74,36 @@ def refuse_browser_data_areas(path: Path, env=None, platform=None) -> None:
                 f"profile path lies in a protected browser data area: {area}")
 
 
+def check_profile_lock(profile_dir: Path) -> None:
+    """POSIX Chrome marks a profile in use with a SingletonLock symlink to
+    <hostname>-<pid>. Proceed only with no lock or a confirmed-stale one;
+    anything else is in use. The lock is never removed or changed (D15)."""
+    import socket
+
+    lock = Path(profile_dir) / "SingletonLock"
+    if not lock.is_symlink():
+        if lock.exists():
+            raise ProfileError("profile is in use (unreadable SingletonLock)")
+        return
+    try:
+        target = os.readlink(lock)
+        host, pid_s = target.rsplit("-", 1)
+        pid = int(pid_s)
+        if not host or pid <= 0:
+            raise ValueError
+    except (OSError, ValueError):
+        raise ProfileError("profile is in use (unreadable SingletonLock)")
+    if host != socket.gethostname():
+        raise ProfileError("profile is in use (lock owned by another host)")
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return  # confirmed stale: local host, PID not running
+    except PermissionError:
+        raise ProfileError("profile is in use (lock PID exists)")
+    raise ProfileError("profile is in use (lock PID is running)")
+
+
 def prepare_profile(name: str, platform=None) -> Path:
     """Resolve, check and (only then) create a persistent profile dir."""
     root = profiles_root()

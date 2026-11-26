@@ -59,7 +59,33 @@ class ToolResponded:
 
 
 def register_parser():
-    """Install the toolResponded parser. Idempotent: installing it again sets
-    the same class. Must run before the first invokeTool (AC-W11)."""
+    """Install the toolResponded and toolsRemoved parsers. Idempotent: installing
+    again sets the same classes. Must run before the first invokeTool (AC-W11)."""
     from zendriver import cdp
     cdp.util._event_parsers["WebMCP.toolResponded"] = ToolResponded
+    cdp.util._event_parsers["WebMCP.toolsRemoved"] = ToolsRemoved
+
+
+class RemovedTool:
+    """The slim {name, frameId} shape Chrome sends for a removed tool."""
+
+    def __init__(self, name, frame_id):
+        self.name = name
+        self.frame_id = frame_id
+
+
+class ToolsRemoved:
+    """WebMCP.toolsRemoved parsed from Chrome's slim {name, frameId} shape.
+
+    zendriver 0.18 parses these as full Tool objects and raises on the missing
+    ``description``, dropping the event; this accepts the slim shape so the live
+    registry reflects unregistration (spec rev 2 §5.1, AC-W7).
+    """
+
+    def __init__(self, tools):
+        self.tools = tools
+
+    @classmethod
+    def from_json(cls, json):
+        return cls(tools=[RemovedTool(str(t["name"]), str(t["frameId"]))
+                          for t in json["tools"]])

@@ -1,0 +1,13 @@
+<!doctype html>
+<title>WebMCP Late</title>
+<script>
+setTimeout(() => {
+  document.modelContext.registerTool({
+    name: "late", description: "Registers 500 ms after load.",
+    inputSchema: {type: "object", properties: {}},
+    execute: async () => ({content: [{type: "text", text: "late-done"}]}),
+  });
+  window.__lateReady = true;
+}, 500);
+</script>
+<p>late page</p>

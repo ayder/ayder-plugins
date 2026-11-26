@@ -15,6 +15,7 @@ import zendriver_tools_chrome as chrome
 import zendriver_tools_console as zconsole
 import zendriver_tools_profiles as profiles
 import zendriver_tools_state as state
+import zendriver_tools_webmcp as zwebmcp
 
 
 class NavigationError(Exception):
@@ -139,6 +140,78 @@ async def navigate_and_wait(tab, url, deadline):
         tab.remove_handlers(cdp.page.LifecycleEvent, on_lifecycle)
 
 
+async def _on_tools_added(ev):
+    for t in ev.tools:
+        state.webmcp_tools[(str(t.frame_id), t.name)] = t
+
+
+async def _on_tools_removed(ev):
+    for t in ev.tools:
+        state.webmcp_tools.pop((str(t.frame_id), t.name), None)
+
+
+async def _on_tool_responded(ev):
+    # Buffer from the moment the handler is attached: a fast tool can answer
+    # before the invokeTool response is processed (P-4, AC-W7b).
+    state.webmcp_responses[ev.invocation_id] = ev
+    if state.webmcp_response_event is not None:
+        state.webmcp_response_event.set()
+
+
+def _clear_webmcp_frame(fid):
+    for key in [k for k in state.webmcp_tools if k[0] == fid]:
+        del state.webmcp_tools[key]
+
+
+async def _on_frame_navigated(ev):
+    if ev.frame.parent_id is None:
+        state.webmcp_tools.clear()   # main frame navigated: a new document
+    else:
+        _clear_webmcp_frame(str(ev.frame.id_))
+
+
+async def _on_frame_detached(ev):
+    _clear_webmcp_frame(str(ev.frame_id))
+
+
+async def setup_webmcp(tab):
+    """Enable WebMCP once, before the first navigation, and attach the live
+    registry + response-buffer handlers (spec rev 2 §5.1). Handlers precede
+    enable so no event is missed."""
+    from zendriver import cdp
+    zwebmcp.register_parser()
+    state.webmcp_response_event = asyncio.Event()
+    tab.add_handler(cdp.web_mcp.ToolsAdded, _on_tools_added)
+    tab.add_handler(zwebmcp.ToolsRemoved, _on_tools_removed)
+    tab.add_handler(zwebmcp.ToolResponded, _on_tool_responded)
+    tab.add_handler(cdp.page.FrameNavigated, _on_frame_navigated)
+    tab.add_handler(cdp.page.FrameDetached, _on_frame_detached)
+    await tab.send(cdp.web_mcp.enable())
+
+
+async def settle_webmcp(deadline):
+    """Drain pending WebMCP handler tasks so a read sees every event delivered
+    so far, deterministically and without a fixed sleep."""
+    names = ("_on_tools_added", "_on_tools_removed", "_on_tool_responded",
+             "_on_frame_navigated", "_on_frame_detached")
+    while True:
+        await asyncio.sleep(0)
+        pending = [t for t in asyncio.all_tasks()
+                   if not t.done()
+                   and getattr(t.get_coro(), "__name__", "") in names]
+        if not pending:
+            return
+        await asyncio.gather(*pending, return_exceptions=True)
+        if time.monotonic() >= deadline:
+            return
+
+
+async def webmcp_available(tab):
+    """Whether the current page has document.modelContext (checked at call
+    time, not cached; spec rev 2 §5.3)."""
+    return await tab.evaluate("typeof document.modelContext") == "object"
+
+
 def close_worker(b, handle, directory, throwaway, end):
     """One executor worker owns the WHOLE normal shutdown: it takes
     cleanup_mutex BEFORE stop() (which itself signals the child), runs
@@ -176,6 +249,9 @@ def close_worker(b, handle, directory, throwaway, end):
         state.console_auto = True
         state.console_capture = False
         state.webmcp_setting = None
+        state.webmcp_tools.clear()
+        state.webmcp_responses.clear()
+        state.webmcp_response_event = None
 
 
 def webmcp_flags(webmcp):
@@ -273,6 +349,8 @@ async def open_work(ctx, url, profile, headless, console=None, webmcp=None):
                 await asyncio.sleep(0.05)
         state.tab = tab
         await setup_tab(tab, state.console_capture)
+        if state.webmcp_setting:
+            await setup_webmcp(tab)
     await navigate_and_wait(state.tab, url, ctx.deadline)
     final_url = await state.tab.evaluate("location.href")
     title = await state.tab.evaluate("document.title")

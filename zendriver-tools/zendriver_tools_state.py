@@ -27,6 +27,9 @@ console_buffer = deque(maxlen=500)
 console_auto = True     # capture follows the URL host until an explicit value
 console_capture = False  # effective capture setting for the current tab
 webmcp_setting = None   # the webmcp value the browser was started with (D28)
+webmcp_tools = {}       # live per-frame registry: (frameId, name) -> Tool
+webmcp_responses = {}   # toolResponded buffered by invocationId (race, P-4)
+webmcp_response_event = None  # asyncio.Event signaled by the response handler
 
 loop = None
 _loop_thread = None
@@ -197,6 +200,7 @@ def reset_for_test():
     global loop, _loop_thread, _lock, browser, handle, profile_dir
     global profile_kind, headless_setting, tab, cleanup_pending, pending_reap
     global cleanup_worker, console_auto, console_capture, webmcp_setting
+    global webmcp_tools, webmcp_responses, webmcp_response_event
     if loop is not None and _loop_thread is not None:
         async def _drain():
             tasks = [t for t in asyncio.all_tasks()
@@ -224,6 +228,9 @@ def reset_for_test():
     console_auto = True
     console_capture = False
     webmcp_setting = None
+    webmcp_tools = {}
+    webmcp_responses = {}
+    webmcp_response_event = None
     cleanup_pending = False
     pending_reap = False
     cleanup_worker = None

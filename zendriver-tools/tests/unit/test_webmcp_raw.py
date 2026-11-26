@@ -46,3 +46,15 @@ def test_register_parser_idempotent():
         "method": "WebMCP.toolResponded",
         "params": {"invocationId": "I3", "status": "Completed", "output": 1}})
     assert ev.status == "Completed" and ev.output == 1
+
+
+def test_tools_removed_slim_shape_parsed():
+    # Chrome sends {name, frameId} only; zendriver's full-Tool parser raises on
+    # the missing description and drops the event. The plugin parser accepts it.
+    wm.register_parser()
+    ev = cdp.util.parse_json_event({
+        "method": "WebMCP.toolsRemoved",
+        "params": {"tools": [{"name": "echo", "frameId": "F1"}]}})
+    assert isinstance(ev, wm.ToolsRemoved)
+    assert ev.tools[0].name == "echo"
+    assert str(ev.tools[0].frame_id) == "F1"

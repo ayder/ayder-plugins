@@ -1,0 +1,28 @@
+<!doctype html>
+<title>WebMCP Main</title>
+<script>
+const mc = document.modelContext;
+const ac = new AbortController();
+window.__abortEcho = () => { ac.abort(); return true; };
+window.__removeIframe = () => { document.querySelector('iframe').remove(); return true; };
+if (mc) {
+  mc.registerTool({
+    name: "echo", description: "Main echo.",
+    inputSchema: {type: "object", properties: {text: {type: "string"}}, required: ["text"]},
+    annotations: {readOnlyHint: true, untrustedContentHint: true},
+    execute: async (input) => ({content: [{type: "text", text: "main-echo:" + input.text}]}),
+  }, {signal: ac.signal});
+  mc.registerTool({
+    name: "fail", description: "Always throws.",
+    inputSchema: {type: "object", properties: {}},
+    execute: async () => { throw new Error("tool-failed-marker"); },
+  });
+  mc.registerTool({
+    name: "slow", description: "Resolves after 5 s.",
+    inputSchema: {type: "object", properties: {}},
+    execute: () => new Promise(r => setTimeout(() => r({content: [{type: "text", text: "slow-done"}]}), 5000)),
+  });
+}
+</script>
+<iframe src="/webmcp_child.html"></iframe>
+<div id="out">main-page</div>

@@ -63,22 +63,27 @@ def browser_read(selector=None, max_chars=20000, timeout_seconds=30):
 
     async def work(ctx):
         import asyncio
+        # Fetch the URL first: no driver call may run after the retry loop,
+        # and the URL does not change during a read.
+        url = await state.tab.evaluate("location.href")
         if selector is None:
-            expr = "document.body ? document.body.innerText : ''"
+            text = await state.tab.evaluate(
+                "document.body ? document.body.innerText : ''")
         else:
             expr = ("(() => { const el = document.querySelector("
                     + json.dumps(selector) + "); return el ? el.innerText : null; })()")
-        while True:
-            text = await state.tab.evaluate(expr)
-            if text or selector is None:
-                break  # whole-page reads return immediately, even if empty
-            if ctx.deadline - time.monotonic() <= 0:
-                if text is None:
+            # Retry only while the element is MISSING; an existing element
+            # returns its text at once, even when empty (spec: lookups double
+            # as waits for an element to appear).
+            while True:
+                text = await state.tab.evaluate(expr)
+                if text is not None:
+                    break
+                remaining = ctx.deadline - time.monotonic()
+                if remaining <= 0:
                     raise state.DeadlineExpired(
                         f"selector {selector!r} not found before the deadline")
-                break  # element exists but is still empty at the deadline
-            await asyncio.sleep(0.1)
-        url = await state.tab.evaluate("location.href")
+                await asyncio.sleep(min(0.1, remaining))
         return text, url
 
     try:

@@ -25,6 +25,19 @@ def test_read_whole_selector_and_late(fixture_server):
     assert "late-text" in str(r)
 
 
+def test_existing_empty_element_returns_promptly(fixture_server):
+    # Spec: lookups retry only while the element is MISSING. An existing
+    # element returns its text at once, even when empty — no error, no wait.
+    url = fixture_server + "/page.html"
+    assert isinstance(bt.browser_open(url=url), ToolSuccess)
+    t0 = time.monotonic()
+    r = bt.browser_read(selector="#empty", timeout_seconds=5)
+    elapsed = time.monotonic() - t0
+    assert isinstance(r, ToolSuccess), r
+    assert elapsed < 2.0
+    assert str(r) == untrusted_line(url) + "\n"  # header + empty payload
+
+
 def test_missing_selector_bounded_error(fixture_server):
     assert isinstance(bt.browser_open(url=fixture_server + "/page.html"),
                       ToolSuccess)

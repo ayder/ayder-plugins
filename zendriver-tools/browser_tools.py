@@ -174,7 +174,34 @@ def browser_eval(script=None, max_chars=20000, timeout_seconds=30):
         v.require_browser(state.browser is not None)
     except v.ValidationError as e:
         return _err(e)
-    return ToolError("not implemented")
+    from zendriver.core.connection import ProtocolException
+    from zendriver_tools_format import format_eval
+
+    wrapped = ("(async () => { const v = await (" + script + ");"
+               " const s = JSON.stringify(v);"
+               " if (s === undefined) throw new Error('result is not JSON-serialisable');"
+               " return s; })()")
+
+    async def work(ctx):
+        return await state.tab.evaluate(wrapped, await_promise=True)
+
+    try:
+        json_text = state.run_call(work, timeout_s=timeout_seconds)
+        url = state.run_call(_current_url, timeout_s=10)
+    except ProtocolException as e:
+        detail = e.args[0] if e.args else None
+        msg = getattr(detail, "text", None) or str(e)
+        exc_obj = getattr(detail, "exception", None)
+        if exc_obj is not None and getattr(exc_obj, "description", None):
+            msg = exc_obj.description
+        return ToolError(f"eval failed: {msg}", "execution")
+    except Exception as e:
+        return _map_error(e)
+    return ToolSuccess(format_eval(url, json_text, max_chars))
+
+
+async def _current_url(ctx):
+    return await state.tab.evaluate("location.href")
 
 
 def browser_console(clear=True):
@@ -205,4 +232,20 @@ def browser_close():
         v.require_browser(state.browser is not None)
     except v.ValidationError as e:
         return _err(e)
-    return ToolError("not implemented")
+    import asyncio
+    import zendriver_tools_browser as zb
+
+    async def work(ctx):
+        b = state.browser
+        handle = state.handle
+        directory = state.profile_dir
+        throwaway = state.profile_kind == "throwaway"
+        await asyncio.get_running_loop().run_in_executor(
+            None, zb.close_worker, b, handle, directory, throwaway, ctx.deadline)
+        return True
+
+    try:
+        state.run_call(work, timeout_s=30)
+    except Exception as e:
+        return _map_error(e)
+    return ToolSuccess("browser closed")

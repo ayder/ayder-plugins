@@ -92,6 +92,42 @@ async def navigate_and_wait(tab, url, deadline):
         tab.remove_handlers(cdp.page.LifecycleEvent, on_lifecycle)
 
 
+def close_worker(b, handle, directory, throwaway, end):
+    """One executor worker owns the WHOLE normal shutdown: it takes
+    cleanup_mutex BEFORE stop() (which itself signals the child), runs
+    stop() on the loop and awaits it, confirms the reap through the
+    recorded handle, deletes only an owned throwaway dir, resets state.
+    Runs in an executor worker, never on the daemon loop thread."""
+    import shutil
+    with state.cleanup_mutex:
+        try:
+            fut = asyncio.run_coroutine_threadsafe(b.stop(), state.loop)
+            fut.result(timeout=max(0.0, end - time.monotonic()))
+        except Exception:
+            pass
+        if handle is not None:
+            try:
+                if handle.poll() is None:
+                    handle.terminate()
+                    try:
+                        handle.wait(timeout=5)
+                    except Exception:
+                        handle.kill()
+                        handle.wait(timeout=2)
+            except Exception:
+                pass
+        reaped = handle is None or handle.poll() is not None
+        if throwaway and reaped and directory is not None:
+            shutil.rmtree(directory, ignore_errors=True)
+        state.browser = None
+        state.handle = None
+        state.profile_dir = None
+        state.profile_kind = None
+        state.headless_setting = None
+        state.tab = None
+        state.console_buffer.clear()
+
+
 async def open_work(ctx, url, profile, headless):
     if state.browser is not None:
         kind = state.profile_kind

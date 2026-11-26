@@ -1,0 +1,10 @@
+<!doctype html>
+<title>WebMCP Dup Child</title>
+<script>
+document.modelContext.registerTool({
+  name: "dup", description: "Duplicate-name child tool.",
+  inputSchema: {type: "object", properties: {}},
+  execute: async () => ({content: [{type: "text", text: "dup-done"}]}),
+});
+</script>
+<p>dup child</p>

@@ -1,0 +1,18 @@
+<!doctype html>
+<title>WebMCP Child</title>
+<script>
+const mc = document.modelContext;
+if (mc) {
+  mc.registerTool({
+    name: "framed", description: "Child frame tool.",
+    inputSchema: {type: "object", properties: {text: {type: "string"}}},
+    execute: async (input) => ({content: [{type: "text", text: "framed:" + input.text}]}),
+  });
+  mc.registerTool({
+    name: "echo", description: "Child echo.",
+    inputSchema: {type: "object", properties: {text: {type: "string"}}},
+    execute: async (input) => ({content: [{type: "text", text: "child-echo:" + input.text}]}),
+  });
+}
+</script>
+<p>child</p>

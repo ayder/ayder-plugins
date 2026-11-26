@@ -36,7 +36,8 @@ def test_registry_smoke(tmp_path, staged_project):
     out = json.loads(r.stdout.strip().splitlines()[-1])
     assert out["names"] == ["browser_click", "browser_close", "browser_console",
                             "browser_eval", "browser_open", "browser_read",
-                            "browser_type"]
+                            "browser_type", "browser_webmcp_call",
+                            "browser_webmcp_list"]
     assert out["flags"] == {
         "browser_open": ["http", True],
         "browser_read": ["r", False],
@@ -45,6 +46,8 @@ def test_registry_smoke(tmp_path, staged_project):
         "browser_eval": ["x", True],
         "browser_console": ["r", False],
         "browser_close": ["w", True],
+        "browser_webmcp_list": ["r", False],
+        "browser_webmcp_call": ["x", True],
     }
     assert out["budget"]["browser_read"] == 0
     assert out["budget"]["browser_eval"] == 0

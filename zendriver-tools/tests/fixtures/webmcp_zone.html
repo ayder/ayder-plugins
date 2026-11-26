@@ -1,0 +1,11 @@
+<!doctype html>
+<title>WebMCP Zone</title>
+<script>
+const ZonePromise = class extends Promise {};
+document.modelContext.registerTool({
+  name: "zone", description: "Returns a Promise subclass (Zone-like).",
+  inputSchema: {type: "object", properties: {}},
+  execute: () => new ZonePromise(r => r({content: [{type: "text", text: "zone-done"}]})),
+});
+</script>
+<p>zone</p>

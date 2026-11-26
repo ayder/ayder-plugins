@@ -175,9 +175,31 @@ def close_worker(b, handle, directory, throwaway, end):
         state.console_buffer.clear()
         state.console_auto = True
         state.console_capture = False
+        state.webmcp_setting = None
 
 
-async def open_work(ctx, url, profile, headless, console=None):
+def webmcp_flags(webmcp):
+    """The single WebMCP feature flag for the launch (D28). True/omitted enables;
+    False disables (zendriver merges it into its --disable-features switch)."""
+    if webmcp is False:
+        return ["--disable-features=WebMCP"]
+    return ["--enable-features=WebMCP"]
+
+
+def make_open_config(exe, directory, headless, webmcp):
+    """The zd.Config open_work launches with; extracted so the launch flags are
+    unit-testable without Chrome (AC-W13)."""
+    import zendriver as zd
+    return zd.Config(
+        browser="chrome",
+        user_data_dir=directory,
+        headless=headless,
+        browser_executable_path=str(exe),
+        browser_args=webmcp_flags(webmcp),
+    )
+
+
+async def open_work(ctx, url, profile, headless, console=None, webmcp=None):
     if state.browser is not None:
         kind = state.profile_kind
         if profile is not None and kind != f"persistent:{profile}":
@@ -186,6 +208,9 @@ async def open_work(ctx, url, profile, headless, console=None):
         if headless is not None and headless != state.headless_setting:
             raise ConfigMismatch(
                 "a different headless setting is in use; call browser_close first")
+        if webmcp is not None and webmcp != state.webmcp_setting:
+            raise ConfigMismatch(
+                "a different webmcp setting is in use; call browser_close first")
         # Capture is runtime-mutable, never a ConfigMismatch (D25/D26). An
         # explicit value sticks; auto reclassifies the requested URL; an
         # omitted value in explicit mode keeps the current setting.
@@ -220,12 +245,8 @@ async def open_work(ctx, url, profile, headless, console=None):
         h = True if headless is None else headless
         ctx.profile_dir = directory
         ctx.throwaway = throwaway
-        config = zd.Config(
-            browser="chrome",
-            user_data_dir=directory,
-            headless=h,
-            browser_executable_path=str(exe),
-        )
+        config = make_open_config(exe, directory, h, webmcp)
+        state.webmcp_setting = True if webmcp is None else webmcp
         b = zd.Browser(config)   # retained BEFORE awaiting start (finding 2)
         ctx.browser = b
         ctx.launch_began = True

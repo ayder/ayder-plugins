@@ -46,7 +46,7 @@ def _map_error(exc):
     return ToolError(f"browser error: {exc}", "execution")
 
 
-def browser_open(url, profile=None, headless=None, console=None,
+def browser_open(url, profile=None, headless=None, console=None, webmcp=None,
                  timeout_seconds=30):
     try:
         v.check_url(url)
@@ -56,12 +56,14 @@ def browser_open(url, profile=None, headless=None, console=None,
             v.check_bool(headless, "headless")
         if console is not None:
             v.check_bool(console, "console")
+        if webmcp is not None:
+            v.check_bool(webmcp, "webmcp")
     except v.ValidationError as e:
         return _err(e)
     try:
         final_url, title, kind = state.run_call(
             functools.partial(zb.open_work, url=url, profile=profile,
-                              headless=headless, console=console),
+                              headless=headless, console=console, webmcp=webmcp),
             timeout_s=timeout_seconds, startup=True,
             cleanup=process.cleanup_launch)
     except Exception as e:

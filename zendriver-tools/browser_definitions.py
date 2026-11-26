@@ -76,6 +76,15 @@ TOOL_DEFINITIONS: Tuple[ToolDefinition, ...] = (
                                            "loopback IPs), off for remote ones. An "
                                            "explicit value holds for the browser "
                                            "session until changed."},
+                "webmcp": {"type": "boolean",
+                           "description": "Enable Chrome's native WebMCP so pages "
+                                          "can expose agent tools (default true). "
+                                          "Fixed at browser start like headless; a "
+                                          "differing value on a running browser "
+                                          "returns an error asking you to "
+                                          "browser_close first. Use false to start "
+                                          "a browser without WebMCP.",
+                           "default": True},
                 "timeout_seconds": _TIMEOUT,
             },
             ["url"],

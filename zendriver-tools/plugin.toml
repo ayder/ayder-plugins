@@ -1,0 +1,12 @@
+[plugin]
+name        = "zendriver-tools"
+version     = "1.0.0"
+api_version = 1
+description = "Drive a real Chrome browser: open, read, click, type, eval, console, close"
+author      = "ayder"
+
+[dependencies]
+zendriver = ">=0.18,<0.19"
+
+[tools]
+definitions = "browser_definitions.py"
